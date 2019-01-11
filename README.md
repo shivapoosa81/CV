@@ -48,3 +48,125 @@ Virgin
 	
 22700	balance to me
 4331	I am paying in revese
+
+
+
+
+let momHappy = true;
+
+var willGetNewPhone = new Promise(function(res,rej){
+  if(momHappy){
+    var phone = {
+                brand: 'Samsung',
+                color: 'black'
+            };
+   res(phone);
+  }
+  else
+  {
+    rej(new Error("no phone"));
+  }
+
+});
+var showOFf = async function(phone){
+return new Promise(function(res,rej){
+     res("my phone"+phone.brand);
+
+});
+};
+console.log("before");
+async function askmom(){
+await willGetNewPhone
+.then(showOFf)
+.then(async function(phone){
+await console.log(phone);
+})
+.catch(async function(msg){
+await console.log("dfdsfdsfd"+msg);
+});
+console.log("after");
+}
+
+askmom();
+
+
+
+
+
+
+
+
+/* ES7 */
+const isMomHappy = false;
+
+// Promise
+const willIGetNewPhone = new Promise(
+    (resolve, reject) => {
+        if (isMomHappy) {
+            const phone = {
+                brand: 'Samsung',
+                color: 'black'
+            };
+            resolve(phone);
+        } else {
+            const reason = new Error('mom is not happy');
+            reject(reason);
+        }
+
+    }
+);
+
+// 2nd promise
+async function showOff(phone) {
+    return new Promise(
+        (resolve, reject) => {
+            var message = 'Hey friend, I have a new ' +
+                phone.color + ' ' + phone.brand + ' phone';
+
+            resolve(message);
+        }
+    );
+};
+
+// call our promise
+async function askMom() {
+    try {
+        console.log('before asking Mom');
+
+        let phone = await willIGetNewPhone;
+        let message = await showOff(phone);
+
+        console.log(message);
+        console.log('after asking mom');
+    }
+    catch (error) {
+        console.log(error.message);
+    }
+}
+
+(async () => {
+    await askMom();
+})();
+
+
+
+
+
+////call, apply,bind
+var obj={};
+var res = function (a,b,c){
+console.log(a+b+c);
+}
+var arr =['a','b','c'];
+res.apply(obj,arr);
+
+var res1 = function (a,b,c){
+console.log(this+a+b+c);
+}
+res.call(obj,'a','b','c');
+
+var res2 = function (a,b,c){
+console.log(a+b+c);
+}
+var fr = res2.bind(obj);
+fr('a','b','c');
