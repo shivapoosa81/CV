@@ -172,5 +172,112 @@ if __name__ == "__main__":
         export_to_html(extracted_data)
 
         
+import os
+import pandas as pd
+import streamlit as st
+from llama_index.core.vector_stores import MetadataFilters, ExactMatchFilter
+from llama_index.core import (
+    VectorStoreIndex,
+    SimpleDirectoryReader,
+    StorageContext,
+    load_index_from_storage,
+)
+from llama_index.core.settings import Settings
+from llama_index.llms.openai import OpenAI
+from llama_index.embeddings.openai import OpenAIEmbedding
+import os
+from llama_index.core import (
+    VectorStoreIndex,
+    SimpleDirectoryReader,
+    StorageContext,
+)
+from llama_index.vector_stores.chroma import ChromaVectorStore
+import chromadb
+from collections import defaultdict
+from dotenv import load_dotenv
+import chromadb
+
+load_dotenv()  
+# --- 1. Configuration ---
+os.environ["OPENAI_API_KEY"] = os.getenv('OPENAI_API_KEY')
+Settings.llm = OpenAI(model="gpt-3.5-turbo")
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-ada-002")
+
+
+# Define file paths
+PDF_DATA_DIR = "data"
+STATIC_DIR = "data"
+CHROMA_PERSIST_DIR = "chroma_db"
+OUTPUT_EXCEL_FILE = "document_dates_report.xlsx"
+CHROMA_COLLECTION_NAME = "document_retrieval"
+
+db = chromadb.PersistentClient(path="chroma_db")
+chroma_collection = db.get_or_create_collection("clr_extract")
+vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+storage_context = StorageContext.from_defaults(vector_store=vector_store)
+extracted_data = []
+docs_by_filename = {}
+
+if chroma_collection.count() == 0:
+    print("No existing index found. Loading documents and building a new index.")
+    documents = SimpleDirectoryReader("data").load_data()
+    index = VectorStoreIndex.from_documents(documents, storage_context=storage_context)
+    print("New index built and saved to ChromaDB.")
+    for doc in documents:
+        filename = os.path.basename(doc.metadata.get('file_name', 'Unknown File'))
+        if filename not in docs_by_filename:
+            docs_by_filename[filename] = []
+        docs_by_filename[filename].append(doc)
+
+    print(f"\nFound {len(docs_by_filename)} unique documents to process.")
+
+    for filename, doc_list in docs_by_filename.items():
+        print(f"\nProcessing '{filename}'...")
+        print(doc_list)
+
+        # Create an index specifically for the content of this single document
+        # This isolates the context for accurate data extraction per file.
+        index = VectorStoreIndex.from_documents(doc_list)
+
+        # Create a query engine to ask questions about this document
+        query_engine = index.as_query_engine()
+
+        # --- Programmatically ask questions to extract the information ---
+        # Query for the creation date
+        created_date_response = query_engine.query(
+            "What is the creation date mentioned in this document? "
+            "Respond with only the date and nothing else."
+        )
+        created_date = str(created_date_response).strip()
+else:
+    print("Existing index found in ChromaDB. Loading from storage.")
+    index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+    print("Index loaded successfully from ChromaDB.")
+    # Get the docstore from the index
+    filenames =[]
+    for metadata in chroma_collection.get()["metadatas"]:
+        if metadata.get("file_name", "Unknown File") not in filenames:
+            filenames.append(metadata.get("file_name", "Unknown File"))
+            print(metadata.get("file_name", "Unknown File"))
+    # retrieved_data = chroma_collection.get()["metadatas"][1].get("file_name", "Unknown File")
+    # print(retrieved_data)
+    for filename in filenames:
+        print(f"\nProcessing '{filename}'...")
+        # Create a filter to retrieve only documents with the specified filename
+        filters = MetadataFilters(filters=[ExactMatchFilter(key="file_name", value=filename)])
+
+        # Create a query engine to ask questions about this document
+        query_engine = index.as_query_engine(filters=filters)
+
+        # --- Programmatically ask questions to extract the information ---
+        # Query for the creation date
+        created_date_response = query_engine.query(
+            "What is the creation date mentioned in this document? "
+            "Respond with only the date and nothing else."
+        )
+        created_date = str(created_date_response).strip()
+        print(created_date)
+        print("Index loaded successfully.")
+
 
         
